@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"httpfromtcp/internal/request"
 	"httpfromtcp/internal/response"
 	"log"
 	"net"
@@ -11,9 +12,10 @@ import (
 type Server struct {
 	closed   atomic.Bool
 	listener net.Listener
+	handler  Handler
 }
 
-func Serve(port int) (*Server, error) {
+func Serve(port int, handler Handler) (*Server, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 
 	if err != nil {
@@ -22,6 +24,7 @@ func Serve(port int) (*Server, error) {
 
 	server := &Server{
 		listener: listener,
+		handler:  handler,
 	}
 
 	go server.listen()
@@ -55,18 +58,15 @@ func (s *Server) listen() {
 
 func (s *Server) handle(conn net.Conn) {
 	defer conn.Close()
-	header := response.GetDefaultHeaders(0)
-
-	err := response.WriteStatusLine(conn, 200)
+	w := response.NewWriter(conn)
+	req, err := request.RequestFromReader(conn)
 	if err != nil {
+		w.WriteStatusLine(response.STATUS_BAD_REQUEST)
+		body := []byte(fmt.Sprintf("Error parsing request: %v", err))
+		w.WriteHeaders(response.GetDefaultHeaders(len(body)))
+		w.WriteBody(body)
 		return
 	}
-
-	err = response.WriteHeaders(conn, header)
-	if err != nil {
-		return
-	}
-	// conn.Write([]byte(""))
-
+	s.handler(w, req)
 	return
 }

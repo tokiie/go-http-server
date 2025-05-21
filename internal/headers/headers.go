@@ -46,18 +46,32 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 
 func (h Headers) Set(key, value string) {
 	key = strings.ToLower(key)
-
-	if _, exist := h[key]; exist {
-		h[key] += ", " + value
-	} else {
-		h[key] = value
+	v, ok := h[key]
+	if ok {
+		value = strings.Join([]string{
+			v,
+			value,
+		}, ", ")
 	}
+	h[key] = value
+}
+
+func (h Headers) Override(key, value string) {
+	key = strings.ToLower(key)
+	h[key] = value
+
+	fmt.Println(key, h[key])
 }
 
 func (h Headers) Get(key string) (string, bool) {
 	key = strings.ToLower(key)
 	v, ok := h[key]
 	return v, ok
+}
+
+func (h Headers) Remove(key string) {
+	key = strings.ToLower(key)
+	delete(h, key)
 }
 
 func isValidKey(key string) bool {
